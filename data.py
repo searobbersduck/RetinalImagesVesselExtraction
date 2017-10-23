@@ -236,9 +236,9 @@ def test_RetinalVesselTrainingDS():
     data_root = './DRIVE_datasets_training_testing/'
     img_file = 'DRIVE_dataset_imgs_train.hdf5'
     mask_file = 'DRIVE_dataset_groundTruth_train.hdf5'
-    patch_w = 256
-    patch_h = 256
-    patch_num_per_img = 2000
+    patch_w = 512
+    patch_h = 512
+    patch_num_per_img = 200
     data_set = RetinalVesselTrainingDS(data_root, img_file, mask_file,
                                           patch_w, patch_h, patch_num_per_img)
     data_loader = torch.utils.data.DataLoader(dataset=data_set, batch_size=10, shuffle=True, pin_memory=True)
