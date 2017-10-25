@@ -1,0 +1,2 @@
+# python common_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/training --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test --patch_size 64 --model duc_hdc --batch 20 --worker 4 --port 8098
+python common_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/training --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test --patch_size 128 --model duc_hdc --batch 20 --worker 4 --port 8099

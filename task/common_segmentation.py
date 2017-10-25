@@ -30,7 +30,7 @@ from models.gcn import GCN
 from models.psp_net import PSPNet
 from models.seg_net import SegNet
 #local lib dataset
-from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS
+from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS, RetinalVesselValidationDS
 # local lib utils
 from utils.misc import CrossEntropyLoss2d
 from utils.utils import AverageMeter
@@ -42,12 +42,11 @@ from piwise.transform import Colorize
 
 # globe scope
 color_transform = Colorize()
-color_transform_target = transforms.ToPILImage()
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description='common segmentation task')
     parser.add_argument('--root', required=True)
+    parser.add_argument('--root_val', required=True)
     parser.add_argument('--size', default=512, type=int)
     parser.add_argument('--patch_size', default=512, type=int)
     parser.add_argument('--model', default='unet', choices=[
@@ -193,9 +192,54 @@ def train(train_dataloader, model, criterion, optimizer, epoch,
                             f'output (epoch: {epoch}, step: {step})')
                 board.image(color_transform(target[0].cpu().data),
                             f'target (epoch: {epoch}, step: {step})')
-                cv_img = np.array(transforms.ToPILImage()(masks[0]))
-                cv2.imshow('test', cv_img)
-                cv2.waitKey(10000)
+                # cv_img = np.array(transforms.ToPILImage()(masks[0]))
+                # cv2.imshow('test', cv_img)
+                # cv2.waitKey(10000)
+    return logger, losses.avg
+
+def val(val_dataloader, model, criterion, epoch,
+          steps_plot=None, steps_loss=None, steps_save=None,
+          board=None):
+    model.eval()
+    batch_time = AverageMeter()
+    data_time = AverageMeter()
+    losses = AverageMeter()
+    end = time.time()
+    logger = []
+    for step, (imgs, masks) in enumerate(val_dataloader):
+        data_time.update(time.time()-end)
+        input = Variable(imgs.cuda())
+        target = Variable(masks.type(torch.LongTensor).cuda())
+        output = model(input)
+        loss = criterion(output, target.squeeze())
+        batch_time.update(time.time()-end)
+        losses.update(loss.cpu().data[0], len(imgs))
+        print_info = 'Eval: [{epoch}][{step}/{tot}]\t' \
+                     'Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t' \
+                     'Data: {data_time.avg:.3f}\t' \
+                     'Loss: {loss.avg:.4f}\t'.format(
+            epoch=epoch,
+            step=step,
+            tot=len(val_dataloader),
+            batch_time=batch_time,
+            data_time=data_time,
+            loss=losses
+        )
+        print(print_info)
+        logger.append(print_info)
+        image = imgs[0]
+        image[0] = image[0] * .229 + .485
+        image[1] = image[1] * .224 + .456
+        image[2] = image[2] * .225 + .406
+        board.image(image,
+                    f'input (epoch: {epoch}, step: {step})')
+        board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
+                    f'output (epoch: {epoch}, step: {step})')
+        board.image(color_transform(target[0].cpu().data),
+                    f'target (epoch: {epoch}, step: {step})')
+        # cv_img = np.array(transforms.ToPILImage()(masks[0]))
+        # cv2.imshow('test', cv_img)
+        # cv2.waitKey(10000)
     return logger, losses.avg
 
 
@@ -223,13 +267,19 @@ def main():
     board = Dashboard(args.port)
     if args.phase == 'train':
         print('=====> Training model:')
-        train_data_loader = DataLoader(RetinalVesselTrainingDS(args.root, args.size, args.patch_size, patches_per_image),
+        train_dataloader = DataLoader(RetinalVesselTrainingDS(args.root, args.size, args.patch_size, patches_per_image),
                                        batch_size=args.batch,
-                                       # num_workers=args.workers,
+                                       num_workers=args.workers,
                                        shuffle=True,
                                        pin_memory=True)
-        # val_data_loader
+
+        val_dataloader = DataLoader(RetinalVesselValidationDS(args.root_val, args.size, args.patch_size),
+                                      batch_size=args.batch,
+                                      num_workers=args.workers,
+                                      shuffle=False,
+                                      pin_memory=False)
         best_train_loss = 1e4
+        best_val_loss = 1e4
         for epoch in range(args.epoch):
             if epoch < args.fix:
                 lr = args.lr
@@ -237,27 +287,29 @@ def main():
                 lr = args.lr * (0.1**(epoch//args.step))
             optimizer = get_optimizer(args.optim)
             optimizer = optimizer(model.parameters(), lr, args.mom, args.wd)
-            # model = UNet(2)
-            # criterion = CrossEntropyLoss2d()
-            # optimizer = optim.SGD(model.parameters(), 1e-4, .9, 2e-5)
             train_logger, train_loss = train(
-                train_data_loader, nn.DataParallel(model).cuda(), criterion, optimizer, epoch,
+                train_dataloader, nn.DataParallel(model).cuda(), criterion, optimizer, epoch,
                 args.steps_plot, args.steps_loss, args.steps_save, board
             )
-            if train_loss < best_train_loss:
-                best_train_loss = train_loss
-                print_info = 'Current Training Loss: {}'.format(best_train_loss)
-                train_logger.append(print_info)
+            val_logger, val_loss = val(
+                val_dataloader, nn.DataParallel(model).cuda(), criterion, epoch, board=board
+            )
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                print_info = 'Current Validation Loss: {}'.format(best_val_loss)
+                val_logger.append(print_info)
+                print(print_info)
                 tmp_file =os.path.join(output_dir, args.dataset+'_segmentation_'+args.model+'_%04d'%epoch+'_best.pth')
                 print_info = '====> Save model: {}'.format(tmp_file)
                 torch.save(model.cpu().state_dict(), tmp_file)
-                train_logger.append(print_info)
+                val_logger.append(print_info)
+                print(print_info)
             if not os.path.isfile(os.path.join(output_dir, 'train.log')):
                 with open(os.path.join(output_dir, 'train.log'), 'w') as fp:
                     fp.write(str(args)+'\n\n')
             with open(os.path.join(output_dir, 'train.log'), 'a') as fp:
                 fp.write('\n' + '\n'.join(train_logger))
-                # fp.write('\n' + '\n'.join(val_logger))
+                fp.write('\n' + '\n'.join(val_logger))
     else:
         raise Exception('No phase found')
 

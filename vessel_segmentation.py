@@ -17,8 +17,8 @@ model = UNet(2)
 data_root = './DRIVE_datasets_training_testing/'
 img_file = 'DRIVE_dataset_imgs_train.hdf5'
 mask_file = 'DRIVE_dataset_groundTruth_train.hdf5'
-patch_w = 512
-patch_h = 512
+patch_w = 256
+patch_h = 256
 patch_num_per_img = 200
 data_set = RetinalVesselTrainingDS(data_root, img_file, mask_file,
                                       patch_w, patch_h, patch_num_per_img)
