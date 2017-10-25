@@ -7,6 +7,10 @@
 *.iml
 DRIVE
 DRIVE_datasets_training_testing
+pretrained
+*/output
+*.zip
+data
 out
 gen### Python template
 # Byte-compiled / optimized / DLL files

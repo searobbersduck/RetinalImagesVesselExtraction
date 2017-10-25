@@ -11,15 +11,36 @@ from utils.misc import CrossEntropyLoss2d
 from piwise.visualize import Dashboard
 from piwise.transform import Colorize
 
+import argparse
+import math
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='vessel segmentation')
+    parser.add_argument('--root', required=True)
+    parser.add_argument('--patch_size', default=256, type=int)
+    parser.add_argument('--model', default='unet', choices=['unet', 'pspnet', 'fcn8', 'fcn16',
+                                                            'fcn32', 'duc_hdc', 'gcn'])
+    parser.add_argument('--port', type=int, default=8097)
+    parser.add_argument('--batch', default=10, type=int)
+    parser.add_argument('--lr', default=0.01, type=float)
+    parser.add_argument('--mom', default=0.9, type=float)
+    parser.add_argument('--wd', default=1e-4, type=float)
+    parser.add_argument('--seed', default=111, type=int)
+    parser.add_argument('--phase', default='train', choices=['train', 'test'])
+    parser.add_argument('--display', default=100, type=int)
+    parser.add_argument('--workers', default=1, type=int)
+    parser.add_argument('--output', default='output', help='The output dir')
+    parser.add_argument('--weight', default=None)
+    return parser.parse_args()
 
 model = UNet(2)
 
 data_root = './DRIVE_datasets_training_testing/'
 img_file = 'DRIVE_dataset_imgs_train.hdf5'
 mask_file = 'DRIVE_dataset_groundTruth_train.hdf5'
-patch_w = 512
-patch_h = 512
-patch_num_per_img = 200
+patch_w = args.batch
+patch_h = args.batch
+patch_num_per_img = math.ceil((2048/args.patch_size)*(2048/args.patch_size))
 data_set = RetinalVesselTrainingDS(data_root, img_file, mask_file,
                                       patch_w, patch_h, patch_num_per_img)
 data_loader = torch.utils.data.DataLoader(dataset=data_set, batch_size=10, shuffle=True, pin_memory=True)
