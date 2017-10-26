@@ -10,6 +10,7 @@ import os
 # utils
 import argparse
 import time
+from glob import glob
 #torch
 import torch
 import torch.backends.cudnn as cudnn
@@ -30,7 +31,8 @@ from models.gcn import GCN
 from models.psp_net import PSPNet
 from models.seg_net import SegNet
 #local lib dataset
-from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS, RetinalVesselValidationDS
+from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS, RetinalVesselValidationDS, \
+    RetinalVesselPredictImage, recompone_overlap
 # local lib utils
 from utils.misc import CrossEntropyLoss2d
 from utils.utils import AverageMeter
@@ -38,6 +40,11 @@ from utils.utils import AverageMeter
 from piwise.visualize import Dashboard
 from piwise.transform import Colorize
 
+# math related
+import numpy as np
+
+# for test
+import cv2
 
 
 # globe scope
@@ -71,7 +78,8 @@ def parse_args():
     parser.add_argument('--phase', default='train', choices=[
         'train',
         'test',
-        'infer'
+        'infer',
+        'predict'
     ])
     parser.add_argument('--output', default='output', help='The output dir')
     parser.add_argument('--weight', default=None)
@@ -141,8 +149,8 @@ def get_optimizer(optim_name):
         optimizer = optim.RMSprop
     return optimizer
 
-import cv2
-import numpy as np
+# import cv2
+# import numpy as np
 
 def train(train_dataloader, model, criterion, optimizer, epoch,
           steps_plot=None, steps_loss=None, steps_save=None,
@@ -188,7 +196,7 @@ def train(train_dataloader, model, criterion, optimizer, epoch,
                 image[2] = image[2] * .225 + .406
                 board.image(image,
                             f'input (epoch: {epoch}, step: {step})')
-                board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
+                board.image(color_transform(output[0].cpu().max(1)[1].data.unsqueeze(0)),
                             f'output (epoch: {epoch}, step: {step})')
                 board.image(color_transform(target[0].cpu().data),
                             f'target (epoch: {epoch}, step: {step})')
@@ -242,6 +250,23 @@ def val(val_dataloader, model, criterion, epoch,
         # cv2.waitKey(10000)
     return logger, losses.avg
 
+def pred_image(pred_image_dataloader, model, size, patch_size, stride, board):
+    model.eval()
+    pred_image_patches = torch.FloatTensor(len(pred_image_dataloader.dataset), 1, patch_size, patch_size)
+    patches_cnt = 0
+    for index, (images) in enumerate(pred_image_dataloader):
+        input = Variable(images.cuda())
+        output = model(input)
+        predit_o = output.cpu().data.max(1)[1].unsqueeze(1).type(torch.FloatTensor)
+        for i in range(predit_o.shape[0]):
+            pred_image_patches[patches_cnt,:] = predit_o[i]
+            patches_cnt += 1
+    pred_image_patches = pred_image_patches.numpy()
+    pred_image = recompone_overlap(pred_image_patches, size, size, stride, stride)
+    pred_image = np.transpose(pred_image[0], (1,2,0))
+    cv2.imshow('pred_image', pred_image)
+    cv2.waitKey(4000)
+
 
 
 def main():
@@ -269,7 +294,7 @@ def main():
         print('=====> Training model:')
         train_dataloader = DataLoader(RetinalVesselTrainingDS(args.root, args.size, args.patch_size, patches_per_image),
                                        batch_size=args.batch,
-                                       num_workers=args.workers,
+                                       # num_workers=args.workers,
                                        shuffle=True,
                                        pin_memory=True)
 
@@ -291,6 +316,8 @@ def main():
                 train_dataloader, nn.DataParallel(model).cuda(), criterion, optimizer, epoch,
                 args.steps_plot, args.steps_loss, args.steps_save, board
             )
+            # val_logger = []
+            # val_loss = 0
             val_logger, val_loss = val(
                 val_dataloader, nn.DataParallel(model).cuda(), criterion, epoch, board=board
             )
@@ -310,7 +337,27 @@ def main():
             with open(os.path.join(output_dir, 'train.log'), 'a') as fp:
                 fp.write('\n' + '\n'.join(train_logger))
                 fp.write('\n' + '\n'.join(val_logger))
-    else:
+    elif args.phase == 'predict':
+        # image_file = '/home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test/ahe/02_test_ahe.png'
+        image_files = glob(os.path.join(args.root, 'ahe/*.png'))
+        for index in image_files:
+            image_file = index
+            size = 512
+            patch_size = 128
+            stride = 32
+            MEAN = [.485, .456, .406]
+            STD = [.229, .224, .225]
+            input_transform = transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Normalize(MEAN, STD)
+                ]
+            )
+            color_trans = transforms.ToPILImage()
+            ds = RetinalVesselPredictImage(image_file, input_transform, size, patch_size, stride)
+            data_loader = DataLoader(ds, batch_size=20, shuffle=False, pin_memory=False)
+            pred_image(data_loader, nn.DataParallel(model).cuda(), size, patch_size, stride, board)
+    else    :
         raise Exception('No phase found')
 
 
