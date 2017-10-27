@@ -1,0 +1,1 @@
+python optic_disc_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/train --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/test
