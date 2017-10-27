@@ -199,6 +199,7 @@ class RetinalVesselTrainingDS(Dataset):
             img = Image.open(ahe_img_file)
             imgs[i] = np.asarray(img)
             mask = Image.open(ahe_mask_file).convert('1', dither=None)
+            # mask = Image.open(ahe_mask_file)
             gts[i] = np.asarray(mask)
         # gts = np.reshape(gts, (gts.shape[0], gts.shape[1], gts.shape[2], 1))
         # gts = gts/255.
@@ -354,10 +355,10 @@ def test_predict_image():
     pred_image = recompone_overlap(pred_image_patches, size, size, stride, stride)
     cv_img = np.transpose(pred_image[0], (1,2,0))
     cv2.imshow('test', cv_img)
-    cv2.waitKey(20000)
+    cv2.waitKey(2000)
 
 # test_ds()
 if __name__ == '__main__':
-    # test_ds()
+    test_ds()
     # test_val_ds()
-    test_predict_image()
+    # test_predict_image()

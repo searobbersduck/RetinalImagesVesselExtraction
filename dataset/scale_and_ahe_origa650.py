@@ -17,9 +17,11 @@ from skimage import measure, exposure
 import skimage
 
 import scipy.misc
+import scipy.io as sio
 
 from PIL import Image
 import os
+import cv2
 
 def tight_crop(img, size=None):
     img_gray = np.mean(img, 2)
@@ -58,7 +60,7 @@ def scale_image(pil_img, scale_size):
     ratio = tw / w
     assert ratio == th / h
     if ratio < 1:
-        image = image.resize((tw, th), Image.CUBIC)
+        image = image.resize((tw, th), Image.ANTIALIAS)
     elif ratio > 1:
         image = image.resize((tw, th), Image.CUBIC)
     return image
@@ -72,15 +74,14 @@ def scale_image_mask(pil_img, scale_size):
     ratio = tw / w
     assert ratio == th / h
     if ratio < 1:
-        image = image.resize((tw, th), Image.ANTIALIAS)
+        image = image.resize((tw, th), Image.NEAREST)
     elif ratio > 1:
         image = image.resize((tw, th), Image.CUBIC)
-    image = image.point(lambda p:p>100 and 255)
     return image
 
 
 raw_path = os.path.join(args.root, 'images')
-raw_mask_path = os.path.join(args.root, '1st_manual')
+raw_mask_path = os.path.join(args.root, 'manual marking')
 ahe_path = os.path.join(args.root, 'ahe')
 ahe_mask_path = os.path.join(args.root, 'ahe_mask')
 
@@ -91,11 +92,11 @@ os.makedirs(ahe_mask_path, exist_ok=True)
 
 from glob import glob
 
-raw_image_list = glob(os.path.join(raw_path, '*.tif'))
+raw_image_list = glob(os.path.join(raw_path, '*.jpg'))
 
 for image_file in raw_image_list:
     base_name = os.path.basename(image_file).split('.')[0]
-    raw_mask_file = os.path.join(raw_mask_path, base_name[0:2]+'_manual1.gif')
+    raw_mask_file = os.path.join(raw_mask_path, base_name+'.mat')
     assert os.path.exists(raw_mask_path)
     out_ahe_file = os.path.join(ahe_path, base_name+'_ahe.png')
     out_ahe_mask_file = os.path.join(ahe_mask_path, base_name+'_ahe_mask.png')
@@ -104,10 +105,19 @@ for image_file in raw_image_list:
     img /= 255
     img_ahe = channelwise_ahe(img)
     out_ahe_img = Image.fromarray(skimage.util.img_as_ubyte(img_ahe))
-    out_ahe_mask = Image.open(raw_mask_file)
-    assert out_ahe_img.size == out_ahe_mask.size
+
+    out_ahe_mask = sio.loadmat(raw_mask_file)
+    out_ahe_mask = out_ahe_mask['mask']
+    # out_ahe_mask = np.reshape(out_ahe_mask, (out_ahe_mask.shape[0], out_ahe_mask.shape[1], 1))
+    out_ahe_mask = out_ahe_mask
+    out_ahe_mask_pil = Image.fromarray(out_ahe_mask)
+
+    print('{}\t'.format(base_name))
+    # assert out_ahe_img.size == out_ahe_mask_pil.size
+    if out_ahe_img.size != out_ahe_mask_pil.size:
+        continue
     out_ahe_img = scale_image(out_ahe_img, 512)
-    out_ahe_mask = scale_image_mask(out_ahe_mask, 512)
+    out_ahe_mask = scale_image_mask(out_ahe_mask_pil, 512)
     out_ahe_img.save(out_ahe_file)
     print('====>save: {}'.format(out_ahe_file))
     out_ahe_mask.save(out_ahe_mask_file)

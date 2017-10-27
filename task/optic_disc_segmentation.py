@@ -31,8 +31,7 @@ from models.gcn import GCN
 from models.psp_net import PSPNet
 from models.seg_net import SegNet
 #local lib dataset
-from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS, RetinalVesselValidationDS, \
-    RetinalVesselPredictImage, recompone_overlap
+from dataset.origa_ahe_dataset import Origa650TrainingDS
 # local lib utils
 from utils.misc import CrossEntropyLoss2d
 from utils.utils import AverageMeter
@@ -51,7 +50,7 @@ import cv2
 color_transform = Colorize()
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='common segmentation task')
+    parser = argparse.ArgumentParser(description='optic-disc and optic-cup segmentation task')
     parser.add_argument('--root', required=True)
     parser.add_argument('--root_val', required=True)
     parser.add_argument('--size', default=512, type=int)
@@ -60,10 +59,10 @@ def parse_args():
         'unet', 'fcn8', 'fcn16', 'fcn32', 'gcn', 'pspnet',
         'duc', 'duc_hdc', 'segnet'
     ])
-    parser.add_argument('--num_classes', default=2, type=int)
+    parser.add_argument('--num_classes', default=3, type=int)
     parser.add_argument('--port', default=8097, type=int)
     parser.add_argument('--epoch', default=200, type=int)
-    parser.add_argument('--batch', default=10, type=int)
+    parser.add_argument('--batch', default=2, type=int)
     parser.add_argument('--lr', default=0.01, type=float)
     parser.add_argument('--mom', default=0.9, type=float)
     parser.add_argument('--wd', default=1e-4, type=float)
@@ -167,7 +166,7 @@ def train(train_dataloader, model, criterion, optimizer, epoch,
         target = Variable(masks.type(torch.LongTensor).cuda())
         output = model(input)
         optimizer.zero_grad()
-        loss = criterion(output, target.squeeze())
+        loss = criterion(output, target)
         loss.backward()
         optimizer.step()
         batch_time.update(time.time()-end)
@@ -196,9 +195,9 @@ def train(train_dataloader, model, criterion, optimizer, epoch,
                 image[2] = image[2] * .225 + .406
                 board.image(image,
                             f'input (epoch: {epoch}, step: {step})')
-                board.image(color_transform(output[0].cpu().max(1)[1].data.unsqueeze(0)),
+                board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
                             f'output (epoch: {epoch}, step: {step})')
-                board.image(color_transform(target[0].cpu().data),
+                board.image(color_transform(target[0].cpu().data.unsqueeze(0)),
                             f'target (epoch: {epoch}, step: {step})')
                 # cv_img = np.array(transforms.ToPILImage()(masks[0]))
                 # cv2.imshow('test', cv_img)
@@ -243,7 +242,7 @@ def val(val_dataloader, model, criterion, epoch,
                     f'input (epoch: {epoch}, step: {step})')
         board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
                     f'output (epoch: {epoch}, step: {step})')
-        board.image(color_transform(target[0].cpu().data),
+        board.image(color_transform(target[0].cpu().data.unsqueeze(0)),
                     f'target (epoch: {epoch}, step: {step})')
         # cv_img = np.array(transforms.ToPILImage()(masks[0]))
         # cv2.imshow('test', cv_img)
@@ -292,13 +291,13 @@ def main():
     board = Dashboard(args.port)
     if args.phase == 'train':
         print('=====> Training model:')
-        train_dataloader = DataLoader(RetinalVesselTrainingDS(args.root, args.size, args.patch_size, patches_per_image),
+        train_dataloader = DataLoader(Origa650TrainingDS(args.root, args.size),
                                        batch_size=args.batch,
-                                       # num_workers=args.workers,
+                                       num_workers=args.workers,
                                        shuffle=True,
                                        pin_memory=True)
 
-        val_dataloader = DataLoader(RetinalVesselValidationDS(args.root_val, args.size, args.patch_size),
+        val_dataloader = DataLoader(Origa650TrainingDS(args.root_val, args.size),
                                       batch_size=args.batch,
                                       num_workers=args.workers,
                                       shuffle=False,
@@ -316,8 +315,8 @@ def main():
                 train_dataloader, nn.DataParallel(model).cuda(), criterion, optimizer, epoch,
                 args.steps_plot, args.steps_loss, args.steps_save, board
             )
-            # val_logger = []
-            # val_loss = 0
+            val_logger = []
+            val_loss = 0
             val_logger, val_loss = val(
                 val_dataloader, nn.DataParallel(model).cuda(), criterion, epoch, board=board
             )
