@@ -21,6 +21,7 @@ import torch.optim as optim
 #torchvision
 import torchvision
 import torchvision.transforms as transforms
+from torchvision.transforms import ToTensor, Normalize
 #local lib model
 from models.u_net import UNet
 from models.duc_hdc import ResNetDUC, ResNetDUCHDC
@@ -44,6 +45,7 @@ import numpy as np
 
 # for test
 import cv2
+from PIL import Image
 
 
 # globe scope
@@ -82,7 +84,7 @@ def parse_args():
     ])
     parser.add_argument('--output', default='output', help='The output dir')
     parser.add_argument('--weight', default=None)
-    parser.add_argument('--dataset', default='common')
+    parser.add_argument('--dataset', default='origa650')
     parser.add_argument('--exp', default='exp')
     parser.add_argument('--fix', default=100, type=int)
     parser.add_argument('--step', default=100, type=int)
@@ -234,19 +236,20 @@ def val(val_dataloader, model, criterion, epoch,
         )
         print(print_info)
         logger.append(print_info)
-        image = imgs[0]
-        image[0] = image[0] * .229 + .485
-        image[1] = image[1] * .224 + .456
-        image[2] = image[2] * .225 + .406
-        board.image(image,
-                    f'input (epoch: {epoch}, step: {step})')
-        board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
-                    f'output (epoch: {epoch}, step: {step})')
-        board.image(color_transform(target[0].cpu().data.unsqueeze(0)),
-                    f'target (epoch: {epoch}, step: {step})')
-        # cv_img = np.array(transforms.ToPILImage()(masks[0]))
-        # cv2.imshow('test', cv_img)
-        # cv2.waitKey(10000)
+        if step % 10 == 0:
+            image = imgs[0]
+            image[0] = image[0] * .229 + .485
+            image[1] = image[1] * .224 + .456
+            image[2] = image[2] * .225 + .406
+            board.image(image,
+                        f'input (epoch: {epoch}, step: {step})')
+            board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
+                        f'output (epoch: {epoch}, step: {step})')
+            board.image(color_transform(target[0].cpu().data.unsqueeze(0)),
+                        f'target (epoch: {epoch}, step: {step})')
+            # cv_img = np.array(transforms.ToPILImage()(masks[0]))
+            # cv2.imshow('test', cv_img)
+            # cv2.waitKey(10000)
     return logger, losses.avg
 
 def pred_image(pred_image_dataloader, model, size, patch_size, stride, board):
@@ -266,6 +269,31 @@ def pred_image(pred_image_dataloader, model, size, patch_size, stride, board):
     cv2.imshow('pred_image', pred_image)
     cv2.waitKey(4000)
 
+def pred_image(pred_image_file, model):
+    model.eval()
+    pil_img = Image.open(pred_image_file)
+    img_trans = transforms.Compose([
+            ToTensor(),
+            Normalize([.485, .456, .406], [.229, .224, .225]),
+        ])
+    img = img_trans(pil_img).unsqueeze(0)
+    input = Variable(img.cuda())
+    output = model(input)
+    pred_img = output[0].cpu().max(0)[1].data.numpy()
+    pred_img = np.array(pred_img, dtype=np.uint8)
+    pred_img *= 100
+    pred_img = np.reshape(pred_img, (pred_img.shape[0], pred_img.shape[1], 1))
+    pred_img = cv2.cvtColor(pred_img,cv2.COLOR_GRAY2RGB)
+    raw_img = np.array(pil_img, dtype=np.uint8)
+    raw_img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
+    stitch_img = np.empty((raw_img.shape[0]*2, raw_img.shape[1], 3), dtype=np.uint8)
+    stitch_img[:raw_img.shape[0], :] = raw_img
+    stitch_img[raw_img.shape[0]:, :] = pred_img
+    cv2.imshow('pred_image', stitch_img)
+    cv2.waitKey(2000)
+
+
+
 
 
 def main():
@@ -279,7 +307,7 @@ def main():
         os.makedirs(args.output)
     time_stamp = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
     output_dir = os.path.join(args.output,
-                              args.dataset + '_segmentaion_' + args.phase + '_' + time_stamp + '_' + args.model + '_' + args.exp)
+                              args.dataset + '_optic_disc_segmentaion_' + args.phase + '_' + time_stamp + '_' + args.model + '_' + args.exp)
     if not os.path.exists(output_dir):
         print('====> Creating ', output_dir)
         os.makedirs(output_dir)
@@ -339,23 +367,9 @@ def main():
     elif args.phase == 'predict':
         # image_file = '/home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test/ahe/02_test_ahe.png'
         image_files = glob(os.path.join(args.root_val, 'ahe/*.png'))
+        # image_files = glob(os.path.join('/home/weidong/code/github/DiabeticRetinopathy_solution/data/zhizhen_new/LabelImages/512_ahe', '*.png'))
         for index in image_files:
-            image_file = index
-            size = 512
-            patch_size = 128
-            stride = 64
-            MEAN = [.485, .456, .406]
-            STD = [.229, .224, .225]
-            input_transform = transforms.Compose(
-                [
-                    transforms.ToTensor(),
-                    transforms.Normalize(MEAN, STD)
-                ]
-            )
-            color_trans = transforms.ToPILImage()
-            ds = RetinalVesselPredictImage(image_file, input_transform, size, patch_size, stride)
-            data_loader = DataLoader(ds, batch_size=20, shuffle=False, pin_memory=False)
-            pred_image(data_loader, nn.DataParallel(model).cuda(), size, patch_size, stride, board)
+            pred_image(index, nn.DataParallel(model).cuda())
     else    :
         raise Exception('No phase found')
 

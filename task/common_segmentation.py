@@ -196,7 +196,7 @@ def train(train_dataloader, model, criterion, optimizer, epoch,
                 image[2] = image[2] * .225 + .406
                 board.image(image,
                             f'input (epoch: {epoch}, step: {step})')
-                board.image(color_transform(output[0].cpu().max(1)[1].data.unsqueeze(0)),
+                board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
                             f'output (epoch: {epoch}, step: {step})')
                 board.image(color_transform(target[0].cpu().data),
                             f'target (epoch: {epoch}, step: {step})')
@@ -250,7 +250,7 @@ def val(val_dataloader, model, criterion, epoch,
         # cv2.waitKey(10000)
     return logger, losses.avg
 
-def pred_image(pred_image_dataloader, model, size, patch_size, stride, board):
+def pred_image(image_file, pred_image_dataloader, model, size, patch_size, stride, board):
     model.eval()
     pred_image_patches = torch.FloatTensor(len(pred_image_dataloader.dataset), 1, patch_size, patch_size)
     patches_cnt = 0
@@ -264,7 +264,23 @@ def pred_image(pred_image_dataloader, model, size, patch_size, stride, board):
     pred_image_patches = pred_image_patches.numpy()
     pred_image = recompone_overlap(pred_image_patches, size, size, stride, stride)
     pred_image = np.transpose(pred_image[0], (1,2,0))
-    cv2.imshow('pred_image', pred_image)
+    pred_image *= 255
+    pred_image = np.array(pred_image, dtype=np.uint8)
+
+    from PIL import Image
+    raw_img = Image.open(image_file)
+    raw_img = np.array(raw_img, dtype=np.uint8)
+    raw_img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
+
+    stitch_img = np.empty((raw_img.shape[0] * 2, raw_img.shape[1], 3), dtype=np.uint8)
+    stitch_img[:raw_img.shape[0], :] = raw_img
+    pred_image = cv2.cvtColor(pred_image, cv2.COLOR_GRAY2RGB)
+    stitch_img[raw_img.shape[0]:, :] = pred_image
+
+    cv2.imshow('pred_image', stitch_img)
+    # tmp_root = './data/retinal_vessel'
+    # vessel_file = os.path.join(tmp_root, os.path.basename(image_file).split('.')[0].split('_')[0]+'.png')
+    # cv2.imwrite(vessel_file, stitch_img)
     cv2.waitKey(4000)
 
 
@@ -339,7 +355,10 @@ def main():
                 fp.write('\n' + '\n'.join(val_logger))
     elif args.phase == 'predict':
         # image_file = '/home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test/ahe/02_test_ahe.png'
-        image_files = glob(os.path.join(args.root_val, 'ahe/*.png'))
+        # image_files = glob(os.path.join(args.root_val, 'ahe/*.png'))
+        image_files = glob(
+            os.path.join('/home/weidong/code/github/DiabeticRetinopathy_solution/data/zhizhen_new/LabelImages/512_ahe',
+                         '*.png'))
         for index in image_files:
             image_file = index
             size = 512
@@ -356,7 +375,7 @@ def main():
             color_trans = transforms.ToPILImage()
             ds = RetinalVesselPredictImage(image_file, input_transform, size, patch_size, stride)
             data_loader = DataLoader(ds, batch_size=20, shuffle=False, pin_memory=False)
-            pred_image(data_loader, nn.DataParallel(model).cuda(), size, patch_size, stride, board)
+            pred_image(image_file, data_loader, nn.DataParallel(model).cuda(), size, patch_size, stride, board)
     else    :
         raise Exception('No phase found')
 

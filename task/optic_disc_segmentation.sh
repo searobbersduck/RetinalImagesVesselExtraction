@@ -1,1 +1,2 @@
-python optic_disc_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/train --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/test
+# python optic_disc_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/train --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/test
+python optic_disc_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/train --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/origa650/test --weight /home/weidong/code/dr/RetinalImagesVesselExtraction/task/output/origa650_optic_disc_segmentaion_train_20171030105209_unet_exp/origa650_segmentation_unet_0007_best.pth --phase predict
