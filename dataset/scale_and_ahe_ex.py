@@ -79,10 +79,16 @@ def scale_image_mask(pil_img, scale_size):
     return image
 
 
-raw_path = os.path.join(args.root, 'raw')
-raw_mask_path = os.path.join(args.root, 'mask')
-ahe_path = os.path.join(args.root, 'ahe')
-ahe_mask_path = os.path.join(args.root, 'ahe_mask')
+# raw_path = os.path.join(args.root, 'raw')
+# raw_mask_path = os.path.join(args.root, 'mask')
+# ahe_path = os.path.join(args.root, 'ahe_512')
+# ahe_mask_path = os.path.join(args.root, 'ahe_512_mask')
+
+raw_path = os.path.join(args.root, 'raw_healthy')
+raw_mask_path = os.path.join(args.root, 'mask_healthy')
+ahe_path = os.path.join(args.root, 'ahe_healthy_512')
+ahe_mask_path = os.path.join(args.root, 'ahe_healthy_512_mask')
+
 
 assert os.path.isdir(raw_path)
 assert os.path.isdir(raw_mask_path)
@@ -106,8 +112,8 @@ for image_file in raw_image_list:
     out_ahe_img = Image.fromarray(skimage.util.img_as_ubyte(img_ahe))
     out_ahe_mask = Image.open(raw_mask_file)
     assert out_ahe_img.size == out_ahe_mask.size
-    out_ahe_img = scale_image(out_ahe_img, 1024)
-    out_ahe_mask = scale_image_mask(out_ahe_mask, 1024)
+    out_ahe_img = scale_image(out_ahe_img, 512)
+    out_ahe_mask = scale_image_mask(out_ahe_mask, 512)
     out_ahe_img.save(out_ahe_file)
     print('====>save: {}'.format(out_ahe_file))
     out_ahe_mask.save(out_ahe_mask_file)

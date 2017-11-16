@@ -33,6 +33,7 @@ from models.seg_net import SegNet
 #local lib dataset
 from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS, RetinalVesselValidationDS, \
     RetinalVesselPredictImage, recompone_overlap
+from dataset.patches_ahe_dataset import patch_input_transform, patch_label_transform, PatchesTrainingDS
 # local lib utils
 from utils.misc import CrossEntropyLoss2d
 from utils.utils import AverageMeter
@@ -51,18 +52,18 @@ import cv2
 color_transform = Colorize()
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='common segmentation task')
+    parser = argparse.ArgumentParser(description='patches segmentation task')
     parser.add_argument('--root', required=True)
     parser.add_argument('--root_val', required=True)
-    parser.add_argument('--size', default=512, type=int)
-    parser.add_argument('--patch_size', default=512, type=int)
+    parser.add_argument('--size', default=256, type=int)
+    parser.add_argument('--patch_size', default=256, type=int)
     parser.add_argument('--model', default='unet', choices=[
         'unet', 'fcn8', 'fcn16', 'fcn32', 'gcn', 'pspnet',
         'duc', 'duc_hdc', 'segnet'
     ])
     parser.add_argument('--num_classes', default=2, type=int)
     parser.add_argument('--port', default=8097, type=int)
-    parser.add_argument('--epoch', default=200, type=int)
+    parser.add_argument('--epoch', default=2000, type=int)
     parser.add_argument('--batch', default=10, type=int)
     parser.add_argument('--lr', default=0.01, type=float)
     parser.add_argument('--mom', default=0.9, type=float)
@@ -84,9 +85,9 @@ def parse_args():
     parser.add_argument('--output', default='output', help='The output dir')
     parser.add_argument('--weight', default=None)
     parser.add_argument('--dataset', default='common')
-    parser.add_argument('--exp', default='exp')
-    parser.add_argument('--fix', default=100, type=int)
-    parser.add_argument('--step', default=100, type=int)
+    parser.add_argument('--exp', default='patches_segmentation')
+    parser.add_argument('--fix', default=500, type=int)
+    parser.add_argument('--step', default=500, type=int)
     return parser.parse_args()
 
 def get_model(model_name, num_classes, weight=None):
@@ -239,12 +240,12 @@ def val(val_dataloader, model, criterion, epoch,
         image[0] = image[0] * .229 + .485
         image[1] = image[1] * .224 + .456
         image[2] = image[2] * .225 + .406
-        board.image(image,
-                    f'input (epoch: {epoch}, step: {step})')
-        board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
-                    f'output (epoch: {epoch}, step: {step})')
-        board.image(color_transform(target[0].cpu().data),
-                    f'target (epoch: {epoch}, step: {step})')
+        # board.image(image,
+        #             f'input (epoch: {epoch}, step: {step})')
+        # board.image(color_transform(output[0].cpu().max(0)[1].data.unsqueeze(0)),
+        #             f'output (epoch: {epoch}, step: {step})')
+        # board.image(color_transform(target[0].cpu().data),
+        #             f'target (epoch: {epoch}, step: {step})')
         # cv_img = np.array(transforms.ToPILImage()(masks[0]))
         # cv2.imshow('test', cv_img)
         # cv2.waitKey(10000)
@@ -272,10 +273,14 @@ def pred_image(image_file, pred_image_dataloader, model, size, patch_size, strid
     raw_img = np.array(raw_img, dtype=np.uint8)
     raw_img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
 
-    stitch_img = np.empty((raw_img.shape[0] * 2, raw_img.shape[1], 3), dtype=np.uint8)
-    stitch_img[:raw_img.shape[0], :] = raw_img
+    # stitch_img = np.empty((raw_img.shape[0] * 2, raw_img.shape[1], 3), dtype=np.uint8)
+    # stitch_img[:raw_img.shape[0], :] = raw_img
+    # pred_image = cv2.cvtColor(pred_image, cv2.COLOR_GRAY2RGB)
+    # stitch_img[raw_img.shape[0]:, :] = pred_image
+    stitch_img = np.empty((raw_img.shape[0], raw_img.shape[1]*2, 3), dtype=np.uint8)
+    stitch_img[:,:raw_img.shape[0]] = raw_img
     pred_image = cv2.cvtColor(pred_image, cv2.COLOR_GRAY2RGB)
-    stitch_img[raw_img.shape[0]:, :] = pred_image
+    stitch_img[:,raw_img.shape[0]:] = pred_image
 
     cv2.imshow('pred_image', stitch_img)
     # tmp_root = './data/retinal_vessel'
@@ -286,7 +291,7 @@ def pred_image(image_file, pred_image_dataloader, model, size, patch_size, strid
 
 
 def main():
-    print('====> Retinal Image Segmentation: ')
+    print('====> Retinal Image Lesions Segmentation: ')
     args = parse_args()
     print('====> Parsing Options: ')
     print(args)
@@ -296,29 +301,29 @@ def main():
         os.makedirs(args.output)
     time_stamp = time.strftime('%Y%m%d%H%M%S', time.localtime(time.time()))
     output_dir = os.path.join(args.output,
-                              args.dataset + '_segmentaion_' + args.phase + '_' + time_stamp + '_' + args.model + '_' + args.exp)
+                              args.dataset + '_lesions_segmentaion_' + args.phase + '_' + time_stamp + '_' + args.model + '_' + args.exp)
     if not os.path.exists(output_dir):
         print('====> Creating ', output_dir)
         os.makedirs(output_dir)
     print('====> load model: ')
     model = get_model(args.model, args.num_classes, args.weight)
     criterion = CrossEntropyLoss2d()
-    patches_per_image = 200
+    # patches_per_image = 200
     print('====> start visualize dashboard: ')
     board = Dashboard(args.port)
     if args.phase == 'train':
         print('=====> Training model:')
-        train_dataloader = DataLoader(RetinalVesselTrainingDS(args.root, args.size, args.patch_size, patches_per_image),
+        train_dataloader = DataLoader(PatchesTrainingDS(args.root, patch_input_transform, patch_label_transform),
                                        batch_size=args.batch,
-                                       # num_workers=args.workers,
+                                       num_workers=args.workers,
                                        shuffle=True,
                                        pin_memory=True)
 
-        val_dataloader = DataLoader(RetinalVesselValidationDS(args.root_val, args.size, args.patch_size),
-                                      batch_size=args.batch,
-                                      # num_workers=args.workers,
-                                      shuffle=False,
-                                      pin_memory=False)
+        val_dataloader = DataLoader(PatchesTrainingDS(args.root, patch_input_transform, patch_label_transform),
+                                       batch_size=args.batch,
+                                       num_workers=args.workers,
+                                       shuffle=False,
+                                       pin_memory=False)
         best_train_loss = 1e4
         best_val_loss = 1e4
         for epoch in range(args.epoch):
@@ -347,6 +352,16 @@ def main():
                 torch.save(model.cpu().state_dict(), tmp_file)
                 val_logger.append(print_info)
                 print(print_info)
+            if epoch % 100 == 0:
+                print_info = 'Current Validation Loss: {}\t\tCurrent Training Loss: {}'.format(best_val_loss, train_loss)
+                val_logger.append(print_info)
+                print(print_info)
+                tmp_file = os.path.join(output_dir,
+                                        args.dataset + '_segmentation_' + args.model + '_%04d' % epoch + '_best_record.pth')
+                print_info = '====> Save model: {}'.format(tmp_file)
+                torch.save(model.cpu().state_dict(), tmp_file)
+                val_logger.append(print_info)
+                print(print_info)
             if not os.path.isfile(os.path.join(output_dir, 'train.log')):
                 with open(os.path.join(output_dir, 'train.log'), 'w') as fp:
                     fp.write(str(args)+'\n\n')
@@ -356,14 +371,18 @@ def main():
     elif args.phase == 'predict':
         # image_file = '/home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test/ahe/02_test_ahe.png'
         # image_files = glob(os.path.join(args.root_val, 'ahe/*.png'))
+        # image_files = glob(
+        #     os.path.join('/home/weidong/code/github/DiabeticRetinopathy_solution/data/zhizhen_new/LabelImages/512_ahe',
+        #                  '*.png'))
+
+        # image_files = glob(os.path.join('/home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX/ahe', '*.png'))
         image_files = glob(
-            os.path.join('/home/weidong/code/github/DiabeticRetinopathy_solution/data/zhizhen_new/LabelImages/512_ahe',
-                         '*.png'))
+            os.path.join('/home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX/ahe_1024', '*.png'))
         for index in image_files:
             image_file = index
-            size = 512
-            patch_size = 128
-            stride = 64
+            size = 1024
+            patch_size = 256
+            stride = 256
             MEAN = [.485, .456, .406]
             STD = [.229, .224, .225]
             input_transform = transforms.Compose(
