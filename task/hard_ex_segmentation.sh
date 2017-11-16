@@ -9,4 +9,4 @@
 
 #python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --batch 1 --weight /home/weidong/code/dr/RetinalImagesVesselExtraction/task/output/common_lesions_segmentaion_train_20171114173605_unet_whole_images_ex/common_segmentation_unet_1634_best.pth --lr 0.001 --exp whole_images_ex_predict --phase predict
 
-python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/ex_whole_image --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/ex_whole_image --lr 0.001 --batch 1 --port 8098 --exp ex_with_healthy
+python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/ex_whole_image --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/ex_whole_image --lr 0.001 --batch 1 --port 8097 --exp ex_with_healthy --weight /home/weidong/code/dr/RetinalImagesVesselExtraction/task/output/common_lesions_segmentaion_train_20171115183716_unet_ex_with_healthy/common_segmentation_unet_1072_best.pth
