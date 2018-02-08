@@ -18,6 +18,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader,Dataset
 from torch.autograd import Variable
 import torch.optim as optim
+from torch.optim import Adam
 #torchvision
 import torchvision
 import torchvision.transforms as transforms
@@ -36,7 +37,7 @@ from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS, RetinalVesselVal
 from dataset.whole_image_ahe_dataset import patch_input_transform, patch_label_transform, WholeImageTrainingDS
 
 # local lib utils
-from utils.misc import CrossEntropyLoss2d
+from utils.misc import CrossEntropyLoss2d, FocalLoss2d
 from utils.utils import AverageMeter
 # visualization&local lib: piwise
 from piwise.visualize import Dashboard
@@ -319,7 +320,7 @@ def scale_image(pil_img, scale_size):
         image = image.resize((tw, th), Image.CUBIC)
     return image
 
-def pred_wholeimage(image_file, input_trans, model, board):
+def pred_wholeimage(image_file, input_trans, model, board, out_dir=None):
     model.eval()
     from PIL import Image
     pil_img = Image.open(image_file)
@@ -344,6 +345,16 @@ def pred_wholeimage(image_file, input_trans, model, board):
     pred_image = np.reshape(pred_image, (pred_image.shape[0], pred_image.shape[1], 1))
     pred_image *= 255
     o_img = np.array(pred_image, dtype=np.uint8)
+
+
+    # import matplotlib.pyplot as plt
+    # m = torch.nn.Softmax2d()
+    # prop = m(output).data
+    # prop = prop.cpu().numpy()[0][1]
+    # plt.figure(1)
+    # plt.subplot(1, 1, 1)
+    # plt.imshow(prop, cmap='hot', interpolation='nearest')
+    # plt.pause(2)
 
 
     # pred_image_patches = torch.FloatTensor(len(pred_image_dataloader.dataset), 1, patch_size, patch_size)
@@ -375,13 +386,24 @@ def pred_wholeimage(image_file, input_trans, model, board):
     pred_image = cv2.cvtColor(pred_image, cv2.COLOR_GRAY2RGB)
     stitch_img[:,raw_img.shape[0]:] = pred_image
 
-    cv2.imshow('pred_image', stitch_img)
+    # cv2.imshow('pred_image', stitch_img)
     tmp_root = './data/ex_predict'
-    vessel_file = os.path.join(tmp_root, os.path.basename(image_file).split('.')[0].split('_')[0]+'.png')
+    tmp_root = './idrid/od_predict'
+    os.makedirs(tmp_root,exist_ok=True)
+    # vessel_file = os.path.join(tmp_root, os.path.basename(image_file).split('.')[0].split('_')[0]+'.png')
+    # cv2.imwrite(vessel_file, stitch_img)
+    # ahe_file = os.path.join(tmp_root, os.path.basename(image_file).split('.')[0].split('_')[0]+'_ahe.png')
+    # out_ahe_img.save(ahe_file)
+    vessel_file = os.path.join(tmp_root, os.path.basename(image_file).split('.')[0] + '.png')
     cv2.imwrite(vessel_file, stitch_img)
-    ahe_file = os.path.join(tmp_root, os.path.basename(image_file).split('.')[0].split('_')[0]+'_ahe.png')
+    ahe_file = os.path.join(tmp_root, os.path.basename(image_file).split('.')[0] + '_ahe.png')
     out_ahe_img.save(ahe_file)
-    # cv2.waitKey(4000)
+    print('===> save:{}'.format(ahe_file))
+    # cv2.waitKey(2000)
+    if out_dir is not None:
+        out_file = os.path.join(out_dir, os.path.basename(image_file).split('.')[0] + '_pred.png')
+        cv2.imwrite(out_file, pred_image)
+        print('generate mask file: {}'.format(out_file))
 
 
 def main():
@@ -401,7 +423,8 @@ def main():
         os.makedirs(output_dir)
     print('====> load model: ')
     model = get_model(args.model, args.num_classes, args.weight)
-    criterion = CrossEntropyLoss2d()
+    # criterion = CrossEntropyLoss2d()
+    criterion = FocalLoss2d()
     # patches_per_image = 200
     print('====> start visualize dashboard: ')
     board = Dashboard(args.port)
@@ -426,7 +449,8 @@ def main():
             else:
                 lr = args.lr * (0.1**(epoch//args.step))
             optimizer = get_optimizer(args.optim)
-            optimizer = optimizer(model.parameters(), lr, args.mom, args.wd)
+            # optimizer = optimizer(model.parameters(), lr, args.mom, args.wd)
+            optimizer = Adam(model.parameters())
             train_logger, train_loss = train(
                 train_dataloader, nn.DataParallel(model).cuda(), criterion, optimizer, epoch,
                 args.steps_plot, args.steps_loss, args.steps_save, board
@@ -469,8 +493,20 @@ def main():
         #     os.path.join('/home/weidong/code/github/DiabeticRetinopathy_solution/data/zhizhen_new/LabelImages/512_ahe',
         #                  '*.png'))
         # image_files = glob(os.path.join('/home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX/raw', '*.jpg'))
-        # image_files = glob(os.path.join('/home/weidong/code/github/ex','*.jpg'))
-        image_files = glob(os.path.join('/home/weidong/data/ex_test', '*.jpg'))
+        image_files = glob(os.path.join('/home/weidong/code/github/ex','*.jpg'))
+        # image_files = glob(os.path.join('/home/weidong/data/test', '*.jpg'))
+        # image_files = glob(os.path.join('/home/weidong/data/ex_test', '*.jpg'))
+        # image_files = glob(os.path.join('/home/weidong/Downloads/ex_whole1', '*.jpg'))
+
+        # idrid
+        # image_files = glob(os.path.join('/media/weidong/seagate_data/dataset/IDRID Challenge/IDRID 1/Apparent Retinopathy', '*.jpg'))
+        image_files = glob(
+            os.path.join('/home/weidong/code/kaggle/IDRID/data/IDRID/IDRID 1/preprocessed/EX/raw', '*.png'))
+        output_mask_dir = None
+        output_mask_dir = '/home/weidong/code/kaggle/IDRID/data/IDRID/IDRID 1/preprocessed/EX/pred'
+        os.makedirs(output_mask_dir, exist_ok=True)
+
+
         for index in image_files:
             image_file = index
             size = 1024
@@ -490,7 +526,7 @@ def main():
             # ds = RetinalVesselPredictImage(image_file, input_transform, size, patch_size, stride)
             # data_loader = DataLoader(ds, batch_size=20, shuffle=False, pin_memory=False)
             # pred_image(image_file, data_loader, nn.DataParallel(model).cuda(), size, patch_size, stride, board)
-            pred_wholeimage(image_file, input_transform, nn.DataParallel(model).cuda(), board)
+            pred_wholeimage(image_file, input_transform, nn.DataParallel(model).cuda(), board, output_mask_dir)
     else    :
         raise Exception('No phase found')
 

@@ -112,11 +112,12 @@ class WholeImageTrainingDS(Dataset):
         #     for index in self.image_list:
         #         f.write(index)
         #         f.write('\n')
-        self.image_list = []
-        with open('whole_images_label.txt','r') as f:
-            lines = f.readlines()
-            for line in lines:
-                self.image_list.append(line.strip())
+
+        # self.image_list = []
+        # with open('whole_images_label.txt','r') as f:
+        #     lines = f.readlines()
+        #     for line in lines:
+        #         self.image_list.append(line.strip())
 
 
         self.input_trans = input_trans

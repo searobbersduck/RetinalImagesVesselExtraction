@@ -30,6 +30,8 @@ from models.fcn8s import FCN8s
 from models.gcn import GCN
 from models.psp_net import PSPNet
 from models.seg_net import SegNet
+from piwise.network import FCN8
+from torch.optim import Adam
 #local lib dataset
 from dataset.vessel_ahe_dataset import RetinalVesselTrainingDS, RetinalVesselValidationDS, \
     RetinalVesselPredictImage, recompone_overlap
@@ -59,7 +61,7 @@ def parse_args():
     parser.add_argument('--patch_size', default=256, type=int)
     parser.add_argument('--model', default='unet', choices=[
         'unet', 'fcn8', 'fcn16', 'fcn32', 'gcn', 'pspnet',
-        'duc', 'duc_hdc', 'segnet'
+        'duc', 'duc_hdc', 'segnet', 'fcn8p'
     ])
     parser.add_argument('--num_classes', default=2, type=int)
     parser.add_argument('--port', default=8097, type=int)
@@ -95,6 +97,8 @@ def get_model(model_name, num_classes, weight=None):
     model = None
     if model_name == 'fcn8':
         model = FCN8s(num_classes=num_classes)
+    elif model_name == 'fcn8p':
+        model = FCN8(num_classes=num_classes)
     elif model_name == 'fcn16':
         model = FCN16VGG(num_classes=num_classes, pretrained=False)
     elif model_name == 'fcn32':
@@ -333,6 +337,7 @@ def main():
                 lr = args.lr * (0.1**(epoch//args.step))
             optimizer = get_optimizer(args.optim)
             optimizer = optimizer(model.parameters(), lr, args.mom, args.wd)
+            optimizer = Adam(model.parameters())
             train_logger, train_loss = train(
                 train_dataloader, nn.DataParallel(model).cuda(), criterion, optimizer, epoch,
                 args.steps_plot, args.steps_loss, args.steps_save, board

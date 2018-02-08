@@ -293,6 +293,72 @@ def pred_image(pred_image_file, model):
     cv2.waitKey(2000)
 
 
+from skimage.filters import threshold_otsu
+from skimage import measure, exposure
+
+import skimage
+
+import scipy.misc
+
+def channelwise_ahe(img):
+    img_ahe = img.copy()
+    for i in range(img.shape[2]):
+        img_ahe[:,:,i] = exposure.equalize_adapthist(img[:,:,i], clip_limit=0.03)
+    return img_ahe
+
+
+def scale_image(pil_img, scale_size):
+    w, h = pil_img.size
+    tw, th = (min(w, h), min(w, h))
+    image = pil_img.crop((w // 2 - tw // 2, h // 2 - th // 2, w // 2 + tw // 2, h // 2 + th // 2))
+    w, h = image.size
+    tw, th = (scale_size, scale_size)
+    ratio = tw / w
+    assert ratio == th / h
+    if ratio < 1:
+        image = image.resize((tw, th), Image.CUBIC)
+    elif ratio > 1:
+        image = image.resize((tw, th), Image.CUBIC)
+    return image
+
+def pred_image_jpg(image_file, model):
+    model.eval()
+
+    from PIL import Image
+    pil_img = Image.open(image_file)
+    from skimage.filters import threshold_otsu
+    from skimage import measure, exposure
+    import skimage
+    import scipy.misc
+    img = scipy.misc.imread(image_file)
+    img = img.astype(np.float32)
+    img /= 255
+    img_ahe = channelwise_ahe(img)
+    out_ahe_img = Image.fromarray(skimage.util.img_as_ubyte(img_ahe))
+    out_ahe_img = scale_image(out_ahe_img, 512)
+    # out_ahe_img.show()
+    raw_img = scale_image(pil_img, 512)
+
+    img_trans = transforms.Compose([
+            ToTensor(),
+            Normalize([.485, .456, .406], [.229, .224, .225]),
+        ])
+    img = img_trans(out_ahe_img).unsqueeze(0)
+    input = Variable(img.cuda())
+    output = model(input)
+    pred_img = output[0].cpu().max(0)[1].data.numpy()
+    pred_img = np.array(pred_img, dtype=np.uint8)
+    pred_img *= 100
+    pred_img = np.reshape(pred_img, (pred_img.shape[0], pred_img.shape[1], 1))
+    pred_img = cv2.cvtColor(pred_img,cv2.COLOR_GRAY2RGB)
+    raw_img = np.array(out_ahe_img, dtype=np.uint8)
+    raw_img = cv2.cvtColor(raw_img, cv2.COLOR_RGB2BGR)
+    stitch_img = np.empty((raw_img.shape[0]*2, raw_img.shape[1], 3), dtype=np.uint8)
+    stitch_img[:raw_img.shape[0], :] = raw_img
+    stitch_img[raw_img.shape[0]:, :] = pred_img
+    cv2.imshow('pred_image', stitch_img)
+    cv2.waitKey(2000)
+
 
 
 
@@ -365,11 +431,18 @@ def main():
                 fp.write('\n' + '\n'.join(train_logger))
                 fp.write('\n' + '\n'.join(val_logger))
     elif args.phase == 'predict':
-        # image_file = '/home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test/ahe/02_test_ahe.png'
-        image_files = glob(os.path.join(args.root_val, 'ahe/*.png'))
+        # # image_file = '/home/weidong/code/dr/RetinalImagesVesselExtraction/data/DRIVE/test/ahe/02_test_ahe.png'
+        # image_files = glob(os.path.join(args.root_val, 'ahe/*.png'))
+        # # image_files = glob(os.path.join('/home/weidong/code/github/DiabeticRetinopathy_solution/data/zhizhen_new/LabelImages/512_ahe', '*.png'))
+        # for index in image_files:
+        #     pred_image(index, nn.DataParallel(model).cuda())
+
+
+        image_files = glob(os.path.join('/media/weidong/seagate_data/dataset/IDRID Challenge/IDRID 3/Training c', '*.jpg'))
         # image_files = glob(os.path.join('/home/weidong/code/github/DiabeticRetinopathy_solution/data/zhizhen_new/LabelImages/512_ahe', '*.png'))
         for index in image_files:
-            pred_image(index, nn.DataParallel(model).cuda())
+            pred_image_jpg(index, nn.DataParallel(model).cuda())
+
     else    :
         raise Exception('No phase found')
 

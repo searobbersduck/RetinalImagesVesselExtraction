@@ -79,15 +79,15 @@ def scale_image_mask(pil_img, scale_size):
     return image
 
 
-# raw_path = os.path.join(args.root, 'raw')
-# raw_mask_path = os.path.join(args.root, 'mask')
-# ahe_path = os.path.join(args.root, 'ahe_512')
-# ahe_mask_path = os.path.join(args.root, 'ahe_512_mask')
+raw_path = os.path.join(args.root, 'raw')
+raw_mask_path = os.path.join(args.root, 'mask')
+ahe_path = os.path.join(args.root, 'ahe_512')
+ahe_mask_path = os.path.join(args.root, 'ahe_512_mask')
 
-raw_path = os.path.join(args.root, 'raw_healthy')
-raw_mask_path = os.path.join(args.root, 'mask_healthy')
-ahe_path = os.path.join(args.root, 'ahe_healthy_512')
-ahe_mask_path = os.path.join(args.root, 'ahe_healthy_512_mask')
+# raw_path = os.path.join(args.root, 'raw_healthy')
+# raw_mask_path = os.path.join(args.root, 'mask_healthy')
+# ahe_path = os.path.join(args.root, 'ahe_healthy_512')
+# ahe_mask_path = os.path.join(args.root, 'ahe_healthy_512_mask')
 
 
 assert os.path.isdir(raw_path)
@@ -101,7 +101,8 @@ raw_image_list = glob(os.path.join(raw_path, '*'))
 
 for image_file in raw_image_list:
     base_name = os.path.basename(image_file).split('.')[0]
-    raw_mask_file = os.path.join(raw_mask_path, base_name+'_EX.png')
+    # raw_mask_file = os.path.join(raw_mask_path, base_name+'_EX.png')
+    raw_mask_file = os.path.join(raw_mask_path, base_name + '_mask.png')
     assert os.path.exists(raw_mask_path)
     out_ahe_file = os.path.join(ahe_path, base_name+'_ahe.png')
     out_ahe_mask_file = os.path.join(ahe_mask_path, base_name+'_ahe_mask.png')

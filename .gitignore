@@ -13,6 +13,7 @@ pretrained
 data
 task/models
 out
+task/idrid
 gen### Python template
 # Byte-compiled / optimized / DLL files
 __pycache__/
