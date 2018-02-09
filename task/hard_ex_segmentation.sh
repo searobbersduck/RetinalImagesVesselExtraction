@@ -22,4 +22,10 @@
 #python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/ex_whole_add_zhongce --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/ex_whole_add_zhongce --batch 2 --lr 0.001 --exp whole_images_ex
 
 #python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --batch 1 --weight /home/weidong/code/dr/RetinalImagesVesselExtraction/task/output/common_lesions_segmentaion_train_20171127152724_unet_whole_images_ex/common_segmentation_unet_0124_best.pth --lr 0.001 --exp whole_images_ex_predict --phase predict
-python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --batch 1 --weight /home/weidong/code/dr/RetinalImagesVesselExtraction/task/output/common_lesions_segmentaion_train_20171128111006_unet_whole_images_ex/common_segmentation_unet_0067_best.pth --lr 0.001 --exp whole_images_ex_predict --phase predict
+
+#最好的模型
+#python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --batch 1 --weight /home/weidong/code/dr/RetinalImagesVesselExtraction/task/output/common_lesions_segmentaion_train_20171128111006_unet_whole_images_ex/common_segmentation_unet_0067_best.pth --lr 0.001 --exp whole_images_ex_predict --phase predict
+
+
+#idrid数据集上的
+python wholeimage_segmentation.py --root /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --root_val /home/weidong/code/dr/RetinalImagesVesselExtraction/data/e_ophtha/e_optha_EX --batch 1 --weight /home/weidong/code/dr/RetinalImagesVesselExtraction/task/output/common_lesions_segmentaion_train_20180208123534_unet_idrid_challenge1_ex/common_segmentation_unet_0130_best.pth --lr 0.001 --exp whole_images_ex_predict --phase predict

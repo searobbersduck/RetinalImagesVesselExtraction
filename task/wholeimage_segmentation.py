@@ -503,7 +503,7 @@ def main():
         image_files = glob(
             os.path.join('/home/weidong/code/kaggle/IDRID/data/IDRID/IDRID 1/preprocessed/EX/raw', '*.png'))
         output_mask_dir = None
-        output_mask_dir = '/home/weidong/code/kaggle/IDRID/data/IDRID/IDRID 1/preprocessed/EX/pred'
+        output_mask_dir = '/home/weidong/code/kaggle/IDRID/data/IDRID/IDRID 1/preprocessed/EX/pred--'
         os.makedirs(output_mask_dir, exist_ok=True)
 
 
